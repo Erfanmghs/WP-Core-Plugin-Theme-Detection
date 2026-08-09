@@ -167,6 +167,8 @@ python3 -m wp_core_fingerprint --config my-scan.json
 
 Second run on the same machine is much faster: reference data is cached under `~/.cache/wp-core-fingerprint/`.
 
+While the scan runs, progress is printed step-by-step to **stderr** (reach target → core assets → tag matching → crawl → reports). Use `--quiet` to disable it for CI or scripting.
+
 ---
 
 ## How detection works
@@ -244,7 +246,7 @@ Looks up detected core/plugin/theme versions on WPVulnerability.net. Advisory hi
 | `--quick` | Compare only recent 6.9.x / 7.x tags (faster) |
 | `--minimal-probes` | Skip heavy supplementary paths (`debug.log`, `wp-json`, feed) |
 | `--sequential` | Fetch target assets one-by-one |
-| `--quiet` | Suppress console summary |
+| `--quiet` | Suppress step-by-step progress and final console summary |
 
 ### Crawl & extensions
 

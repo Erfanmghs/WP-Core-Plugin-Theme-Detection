@@ -35,6 +35,7 @@ from wp_core_fingerprint.models import (
     TagScore,
     TOOL_VERSION,
 )
+from wp_core_fingerprint.progress import Progress
 from wp_core_fingerprint.report import (
     report_to_html,
     report_to_json,
@@ -122,6 +123,7 @@ class WPCoreFingerprinter:
         use_cache: bool = True,
         check_vulns: bool = False,
         max_requests: int = 0,
+        quiet: bool = False,
     ) -> None:
         if gentle:
             target_delay = GENTLE_DEFAULTS["target_delay"]
@@ -155,6 +157,7 @@ class WPCoreFingerprinter:
         self.ignore_robots = ignore_robots
         self.check_vulns = check_vulns
         self.scan_profile = "gentle" if gentle else "normal"
+        self.progress = Progress.null() if quiet else Progress()
         self.http = RateLimitedHttp(
             user_agent=user_agent,
             timeout=timeout,
@@ -205,15 +208,20 @@ class WPCoreFingerprinter:
 
     def collect_assets(self) -> list[AssetFingerprint]:
         assets: list[AssetFingerprint] = []
+        total = len(ASSET_CATALOG)
         if self.sequential_target or self.workers <= 1:
-            for spec in ASSET_CATALOG:
+            for i, spec in enumerate(ASSET_CATALOG, 1):
+                self.progress.info(f"core asset {i}/{total}: {spec['name']} ...")
                 assets.append(self.fetch_asset(spec))
         else:
+            self.progress.info(f"fetching {total} core assets in parallel ...")
             with ThreadPoolExecutor(max_workers=self.workers) as pool:
                 futures = [pool.submit(self.fetch_asset, spec) for spec in ASSET_CATALOG]
                 for fut in as_completed(futures):
                     assets.append(fut.result())
         assets.sort(key=lambda a: a.name)
+        ok = sum(1 for a in assets if a.md5)
+        self.progress.done(f"{ok}/{total} core assets fingerprinted")
         return assets
 
     def analyze_html(self, html: str) -> dict[str, Any]:
@@ -578,6 +586,7 @@ class WPCoreFingerprinter:
             crawl_delay=self.crawl_delay,
             enumerate_plugins=self.enumerate_plugins,
             ignore_robots=self.ignore_robots,
+            progress=self.progress,
         )
         result = crawler.run(initial_html=seed_html)
         return (
@@ -590,6 +599,10 @@ class WPCoreFingerprinter:
 
     def run(self) -> FingerprintReport:
         notes: list[str] = []
+        p = self.progress
+        p.banner(self.base_url, self.scan_profile)
+        if self.gentle:
+            p.info("gentle mode: slow pacing — a full scan may take several minutes")
         limitations = [
             f"Compares against GitHub stable release tags ({SUPPORTED_VERSION_RANGE})",
             "version.php does not return plaintext over HTTP (PHP execution)",
@@ -599,13 +612,18 @@ class WPCoreFingerprinter:
             "Very old installs (pre-3.8) have fewer fingerprint assets available",
         ]
 
+        p.phase("Reach target")
+        p.step("Fetching homepage ...")
         status, homepage_body, _, err = self._request(self.base_url)
         if err:
             raise RuntimeError(f"Cannot reach target: {err}")
         html = homepage_body.decode("utf-8", errors="ignore")
         html_ind = self.analyze_html(html)
         plugins = self.extract_plugins(html)
+        p.done(f"homepage HTTP {status}, {len(homepage_body):,} bytes")
 
+        p.phase("Core fingerprint")
+        p.step("Downloading wp-includes assets ...")
         assets = self.collect_assets()
         live_map = {a.name: a for a in assets}
         live_ok = {n for n, fp in live_map.items() if fp.md5}
@@ -617,22 +635,31 @@ class WPCoreFingerprinter:
         notes.append(f"Detected era: {era} (from {len(live_ok)} fingerprint assets)")
         notes.append(f"Scan profile: {self.scan_profile}")
 
+        p.step("Supplementary probes (readme, version.php, ...) ...")
         supplementary = self.supplementary_probes()
+        p.done(f"{len(supplementary)} probes completed")
         notes.extend(self.infer_version_floor(html_ind, supplementary))
 
+        p.phase("Version matching")
+        p.step("Loading GitHub release tag list ...")
         all_tags = self._load_github_tags()
+        p.done(f"{len(all_tags)} tags in cache/API")
         candidate_tags = self.resolve_candidate_tags(all_tags, era, html_ind, supplementary)
         notes.append(f"Comparing against {len(candidate_tags)} GitHub release tags")
         if self.asset_cache.stats.get("hits", 0):
             notes.append(f"Reference cache hits: {self.asset_cache.stats['hits']}")
 
-        # Phase 1: fast anchor scoring
+        p.step(f"Phase 1: anchor scoring across {len(candidate_tags)} candidate tags ...")
         anchor_names = self.phase1_asset_names(live_map)
         phase1 = self.score_tags_parallel(candidate_tags, live_map, anchor_names)
         phase1.sort(
             key=lambda x: (x.weighted_score, x.match_count, x.confidence_pct),
             reverse=True,
         )
+        if phase1:
+            p.done(f"top anchor match: {phase1[0].tag} ({phase1[0].match_count} assets)")
+        else:
+            p.done("no anchor matches yet")
 
         if phase1:
             finalists = [s.tag for s in phase1[: self.phase1_limit]]
@@ -640,6 +667,7 @@ class WPCoreFingerprinter:
             finalists = candidate_tags[: self.phase1_limit]
 
         if finalists and self.asset_cache.enabled:
+            p.info("prefetching GitHub reference files for finalists ...")
             prefetch_paths: set[str] = set()
             for spec in ASSET_CATALOG:
                 for gp in spec["github_paths"]:
@@ -647,13 +675,21 @@ class WPCoreFingerprinter:
             for tag in finalists[:8]:
                 self.asset_cache.prefetch_assets(tag, sorted(prefetch_paths), self.http.get)
 
-        # Phase 2: full applicable-asset scoring on finalists
+        p.step(f"Phase 2: full MD5 match on {len(finalists)} finalist tags ...")
         scored = self.score_tags_parallel(finalists, live_map, None)
         scored.sort(
             key=lambda x: (x.weighted_score, x.match_count, x.confidence_pct),
             reverse=True,
         )
         self.find_unique_discriminators(scored, live_map)
+        if scored:
+            p.done(
+                f"best match: {scored[0].tag} "
+                f"({scored[0].match_count}/{scored[0].total_assets}, "
+                f"{scored[0].confidence_pct}%)"
+            )
+        else:
+            p.done("no version match")
 
         detected = scored[0].tag if scored else None
         conf_pct = scored[0].confidence_pct if scored else 0.0
@@ -689,11 +725,20 @@ class WPCoreFingerprinter:
         mu_plugins_detected: list[dict[str, Any]] = []
         crawl_stats: dict[str, Any] = {}
         if self.crawl:
+            p.phase("Plugin & theme crawl")
+            p.step(
+                f"Crawling up to {self.crawl_max_pages} pages "
+                f"(depth {self.crawl_max_depth}) ..."
+            )
             crawl_plugins, themes_detected, mu_plugins_detected, crawl_stats, crawl_notes = (
                 self.run_extension_crawl(html)
             )
             plugins = crawl_plugins
             notes.extend(crawl_notes)
+            p.done(
+                f"{crawl_stats.get('plugins_discovered', 0)} plugins, "
+                f"{crawl_stats.get('themes_discovered', 0)} themes"
+            )
             limitations.append(
                 "Crawl discovers extensions referenced in HTML; "
                 "must-use or admin-only plugins may still be missed"
@@ -705,11 +750,14 @@ class WPCoreFingerprinter:
 
         vulnerabilities: list[dict[str, Any]] = []
         if self.check_vulns:
+            p.phase("Advisory lookup")
+            p.step("Querying WPVulnerability.net ...")
             vulnerabilities = scan_vulnerabilities(
                 detected, plugins, themes_detected, self.http.get
             )
             if vulnerabilities:
                 notes.append(f"Advisory lookup: {len(vulnerabilities)} potential issue(s)")
+            p.done(f"{len(vulnerabilities)} advisory hit(s)")
 
         top_candidates = [
             {
@@ -915,7 +963,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=60,
         help="Top N tags from phase-1 to fully score in phase-2",
     )
-    p.add_argument("--quiet", action="store_true", help="Suppress console summary")
+    p.add_argument("--quiet", action="store_true", help="Suppress progress output and console summary")
     return p.parse_args(argv)
 
 
@@ -1041,6 +1089,7 @@ def main(argv: list[str] | None = None) -> int:
         use_cache=not args.no_cache,
         check_vulns=args.check_vulns,
         max_requests=args.max_requests,
+        quiet=args.quiet,
     )
     t0 = time.time()
     try:
@@ -1058,32 +1107,38 @@ def main(argv: list[str] | None = None) -> int:
         print_summary(report)
         print(f"Elapsed: {time.time() - t0:.1f}s")
 
+    if not args.quiet:
+        fp.progress.phase("Writing reports")
+
     payload = report_to_json(report)
     if args.output:
         out = Path(args.output)
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         if not args.quiet:
-            print(f"JSON report: {out}")
+            fp.progress.info(f"JSON -> {out}")
 
     if args.markdown:
         md = Path(args.markdown)
         md.parent.mkdir(parents=True, exist_ok=True)
         md.write_text(report_to_markdown(report), encoding="utf-8")
         if not args.quiet:
-            print(f"Markdown report: {md}")
+            fp.progress.info(f"Markdown -> {md}")
 
     if args.html:
         hp = Path(args.html)
         hp.parent.mkdir(parents=True, exist_ok=True)
         hp.write_text(report_to_html(report), encoding="utf-8")
         if not args.quiet:
-            print(f"HTML report: {hp}")
+            fp.progress.info(f"HTML -> {hp}")
 
     if args.sarif:
         write_sarif(report, args.sarif)
         if not args.quiet:
-            print(f"SARIF report: {args.sarif}")
+            fp.progress.info(f"SARIF -> {args.sarif}")
+
+    if not args.quiet:
+        print("", file=sys.stderr)
 
     if not _confidence_meets(report.confidence, args.min_confidence):
         return EXIT_LOW_CONFIDENCE

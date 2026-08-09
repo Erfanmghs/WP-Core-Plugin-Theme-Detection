@@ -9,7 +9,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from itertools import count
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 from urllib.parse import urljoin, urlparse, urlunparse
 
 from wp_core_fingerprint.extensions import (
@@ -20,6 +20,9 @@ from wp_core_fingerprint.extensions import (
     resolve_all_extensions,
 )
 from wp_core_fingerprint.robots import RobotsRules, fetch_robots
+
+if TYPE_CHECKING:
+    from wp_core_fingerprint.progress import Progress
 
 HttpGet = Callable[[str, str], tuple[int | None, bytes, dict[str, str], str | None]]
 
@@ -105,6 +108,7 @@ class WordPressExtensionCrawler:
         enumerate_plugins: bool = False,
         ignore_robots: bool = False,
         plugin_wordlist: list[str] | None = None,
+        progress: "Progress | None" = None,
     ) -> None:
         self.base_url = base_url.rstrip("/") + "/"
         parsed = urlparse(self.base_url)
@@ -125,6 +129,7 @@ class WordPressExtensionCrawler:
         self._robots: RobotsRules | None = None
         self._active_theme_hint: str | None = None
         self._counter = count()
+        self._progress = progress
 
     def url(self, path: str) -> str:
         return urljoin(self.base_url, path.lstrip("/"))
@@ -276,6 +281,11 @@ class WordPressExtensionCrawler:
             return None
 
         found = 0
+        total = len(self.plugin_wordlist)
+        if self._progress:
+            self._progress.info(
+                f"enumerating {total} common plugin slugs (may take several minutes) ..."
+            )
         with ThreadPoolExecutor(max_workers=min(self.workers, 4)) as pool:
             futures = {pool.submit(probe, slug): slug for slug in self.plugin_wordlist}
             for fut in as_completed(futures):
@@ -284,6 +294,8 @@ class WordPressExtensionCrawler:
                     merge_records(self._records, slug, "plugin", "enumeration")
                     found += 1
         stats.enumerated_plugins = found
+        if self._progress and self.enumerate_plugins:
+            self._progress.done(f"enumeration found {found} plugin(s)")
 
     def _process_url(
         self, url: str, depth: int
@@ -296,12 +308,16 @@ class WordPressExtensionCrawler:
 
     def crawl_pages(self, stats: CrawlStats) -> None:
         if not self.ignore_robots:
+            if self._progress:
+                self._progress.info("reading robots.txt ...")
             self._robots = fetch_robots(self.base_url, self._get)
 
         start = self.base_url.rstrip("/") or self.origin
         heap: list[tuple[int, int, str, int]] = []
         heapq.heappush(heap, (0, next(self._counter), start, 0))
 
+        if self._progress:
+            self._progress.info("discovering sitemap and wp-json URLs ...")
         sitemap_seeds = self._discover_sitemap_urls()
         stats.sitemap_urls = len(sitemap_seeds)
         for seed in sitemap_seeds[:300]:
@@ -345,6 +361,12 @@ class WordPressExtensionCrawler:
             for page_url, depth, html, err, links in results:
                 stats.pages_requested += 1
                 fetched += 1
+                if self._progress:
+                    short = page_url if len(page_url) < 72 else page_url[:69] + "..."
+                    status = "OK" if html and not err else (err or "fail")
+                    self._progress.info(
+                        f"page {fetched}/{self.max_pages}: {short} ({status})"
+                    )
                 if err or html is None:
                     stats.pages_failed += 1
                     continue
@@ -388,8 +410,12 @@ class WordPressExtensionCrawler:
             self._ingest_html(initial_html, start)
 
         self.crawl_pages(stats)
+        if self._progress:
+            self._progress.info("probing must-use plugins ...")
         self._probe_mu_plugins()
         self._enumerate_plugins(stats)
+        if self._progress:
+            self._progress.info("resolving plugin/theme versions from source files ...")
         self._mark_active_themes()
 
         def crawl_get(url: str, method: str = "GET") -> tuple[int | None, bytes, dict[str, str], str | None]:
