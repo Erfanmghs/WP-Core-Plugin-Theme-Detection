@@ -19,6 +19,7 @@ reports/
 scans/
 
 # IDE / OS
+.cursor/
 .idea/
 .vscode/
 *.swp

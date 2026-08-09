@@ -22,4 +22,6 @@ jobs:
       - name: Unit tests
         run: python -m unittest discover -s tests -v
       - name: CLI smoke
-        run: python -m wp_core_fingerprint --help
+        run: |
+          wp-fingerprint --help
+          python -m wp_core_fingerprint --help

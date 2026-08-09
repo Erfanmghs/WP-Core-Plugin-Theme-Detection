@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 REPORT_SCHEMA_VERSION = "3.0.0"
-TOOL_VERSION = "3.0.0"
+TOOL_VERSION = "3.0.1"
 
 
 @dataclass
