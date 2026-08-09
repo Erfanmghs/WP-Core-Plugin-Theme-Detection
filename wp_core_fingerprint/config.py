@@ -12,8 +12,6 @@ CONFIG_KEYS = {
     "markdown",
     "html",
     "sarif",
-    "html",
-    "sarif",
     "user_agent",
     "timeout",
     "workers",
@@ -53,7 +51,7 @@ def load_config(path: str | Path) -> dict[str, Any]:
     p = Path(path)
     if not p.is_file():
         raise FileNotFoundError(f"Config not found: {p}")
-    data = json.loads(p.read_text(encoding="utf-8"))
+    data = json.loads(p.read_text(encoding="utf-8-sig"))
     if not isinstance(data, dict):
         raise ValueError("Config root must be a JSON object")
     unknown = set(data) - CONFIG_KEYS
