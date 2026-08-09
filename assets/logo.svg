@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 64" fill="none">
+  <rect width="160" height="64" rx="10" fill="#161b22"/>
+  <text x="20" y="42" font-family="Consolas, 'Courier New', monospace" font-size="28" font-weight="700" fill="#e6edf3" letter-spacing="1">EM</text>
+  <text x="78" y="42" font-family="Consolas, 'Courier New', monospace" font-size="22" font-weight="400" fill="#484f58">-</text>
+  <text x="96" y="42" font-family="Consolas, 'Courier New', monospace" font-size="28" font-weight="700" fill="#3ecf8e" letter-spacing="1">WP</text>
+</svg>

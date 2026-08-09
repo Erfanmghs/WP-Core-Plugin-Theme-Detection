@@ -1,0 +1,13 @@
+{
+  "url": "https://example.com/blog/",
+  "gentle": true,
+  "crawl": true,
+  "crawl_workers": 2,
+  "crawl_max_pages": 60,
+  "enumerate_plugins": true,
+  "check_vulns": true,
+  "min_confidence": "medium",
+  "output": "report.json",
+  "markdown": "report.md",
+  "html": "report.html"
+}

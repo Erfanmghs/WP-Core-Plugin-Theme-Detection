@@ -1,0 +1,37 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tool output (may contain scan targets — never commit)
+report.json
+report.md
+*.report.json
+*.report.md
+output/
+reports/
+scans/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Distribution
+dist/
+build/
+*.egg-info/
+
+# Secrets
+.env
+*.pem
+*.key
+credentials*

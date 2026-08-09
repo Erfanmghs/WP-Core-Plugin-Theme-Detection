@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wp-core-fingerprint"
+version = "3.0.0"
+description = "WordPress core, plugin and theme version detection via public HTTP fingerprinting"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Erfanmghs", url = "https://github.com/Erfanmghs" }]
+keywords = ["wordpress", "security", "fingerprint", "version-detection", "plugins", "themes"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Internet :: WWW/HTTP",
+]
+
+[project.urls]
+Homepage = "https://github.com/Erfanmghs/WordPress-Core-Plugin-Theme-Detection"
+Repository = "https://github.com/Erfanmghs/WordPress-Core-Plugin-Theme-Detection"
+Issues = "https://github.com/Erfanmghs/WordPress-Core-Plugin-Theme-Detection/issues"
+
+[project.scripts]
+wp-fingerprint = "wp_core_fingerprint.fingerprint:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[tool.setuptools.package-data]
+wp_core_fingerprint = ["data/*.txt"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["wp_core_fingerprint*"]
