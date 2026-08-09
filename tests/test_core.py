@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from wp_core_fingerprint.cache import AssetCache
+from wp_core_fingerprint.config import load_config
 from wp_core_fingerprint.extensions import (
     parse_header_version,
     parse_readme_version,
@@ -60,6 +61,16 @@ class TestRobots(unittest.TestCase):
         rules.feed("Disallow: /wp-admin/")
         self.assertFalse(rules.allowed("https://ex.com/wp-admin/"))
         self.assertTrue(rules.allowed("https://ex.com/blog/post"))
+
+
+class TestConfig(unittest.TestCase):
+    def test_load_config_utf8_bom(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "config.json"
+            path.write_bytes(b"\xef\xbb\xbf" + b'{"url": "https://example.com/", "gentle": true}')
+            cfg = load_config(path)
+            self.assertEqual(cfg["url"], "https://example.com/")
+            self.assertTrue(cfg["gentle"])
 
 
 class TestCache(unittest.TestCase):
