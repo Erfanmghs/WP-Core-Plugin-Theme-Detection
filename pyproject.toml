@@ -26,9 +26,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Erfanmghs/WordPress-Core-Plugin-Theme-Detection"
-Repository = "https://github.com/Erfanmghs/WordPress-Core-Plugin-Theme-Detection"
-Issues = "https://github.com/Erfanmghs/WordPress-Core-Plugin-Theme-Detection/issues"
+Homepage = "https://github.com/Erfanmghs/wp-core-plugin-theme-detection"
+Repository = "https://github.com/Erfanmghs/wp-core-plugin-theme-detection"
+Issues = "https://github.com/Erfanmghs/wp-core-plugin-theme-detection/issues"
 
 [project.scripts]
 wp-fingerprint = "wp_core_fingerprint.fingerprint:main"
