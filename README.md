@@ -26,8 +26,8 @@ Use both if you can: this tool for **exact core + evidence**, WPScan for **enume
 ## Install and run
 
 ```bash
-git clone https://github.com/Erfanmghs/wp-core-plugin-theme-detection.git
-cd wp-core-plugin-theme-detection
+git clone https://github.com/Erfanmghs/WP-Core-Plugin-Theme-Detection.git
+cd WP-Core-Plugin-Theme-Detection
 pip install .
 ```
 

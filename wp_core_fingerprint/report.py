@@ -209,7 +209,7 @@ def report_to_sarif(r: FingerprintReport) -> dict[str, Any]:
                     "driver": {
                         "name": "wp-core-fingerprint",
                         "version": r.tool_version,
-                        "informationUri": "https://github.com/Erfanmghs/wp-core-plugin-theme-detection",
+                        "informationUri": "https://github.com/Erfanmghs/WP-Core-Plugin-Theme-Detection",
                     }
                 },
                 "results": results,

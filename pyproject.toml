@@ -9,7 +9,7 @@ description = "WordPress core, plugin and theme version detection via public HTT
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
-authors = [{ name = "Erfanmghs", url = "https://github.com/Erfanmghs" }]
+authors = [{ name = "Erfanmghs", email = "145129150+Erfanmghs@users.noreply.github.com" }]
 keywords = ["wordpress", "security", "fingerprint", "version-detection", "plugins", "themes"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -26,9 +26,9 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Erfanmghs/wp-core-plugin-theme-detection"
-Repository = "https://github.com/Erfanmghs/wp-core-plugin-theme-detection"
-Issues = "https://github.com/Erfanmghs/wp-core-plugin-theme-detection/issues"
+Homepage = "https://github.com/Erfanmghs/WP-Core-Plugin-Theme-Detection"
+Repository = "https://github.com/Erfanmghs/WP-Core-Plugin-Theme-Detection"
+Issues = "https://github.com/Erfanmghs/WP-Core-Plugin-Theme-Detection/issues"
 
 [project.scripts]
 wp-fingerprint = "wp_core_fingerprint.fingerprint:main"
