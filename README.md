@@ -5,14 +5,19 @@
 
 Remote fingerprinting for WordPress **core** (down to the patch) and, with `--crawl`, **plugins and themes**. Built for hardened sites where generator meta, `readme.html`, and `version.php` no longer leak the version.
 
-Passive only — public HTTP GET requests. No login, no Ruby, no API token for core detection.
+## Why this exists
 
-| | |
-|---|---|
-| **PyPI-style name** | `wp-core-fingerprint` |
-| **CLI command** | `wp-fingerprint` |
-| **Python module** | `python3 -m wp_core_fingerprint` |
-| **Repository** | https://github.com/Erfanmghs/WP-Core-Plugin-Theme-Detection |
+On a pentest or audit you often hit WordPress that has:
+
+- no `<meta name="generator">`
+- `readme.html` returning 404
+- `wp-includes/version.php` returning an empty body (PHP executes server-side)
+
+You still need the exact core version before CVE mapping means anything.
+
+This tool compares public core file hashes against every stable release on GitHub. When several assets match one tag and one file only matches that tag among the top candidates, you get patch-level confidence even on hardened installs.
+
+**WPScan** ([wpscanteam/wpscan](https://github.com/wpscanteam/wpscan)) is excellent for broad scanning but needs an API token and uses heuristics for core. Use both when you can: this tool for **exact core + evidence**, WPScan for **enumeration and CVE mapping**.
 
 ---
 
@@ -53,22 +58,6 @@ Passive only — public HTTP GET requests. No login, no Ruby, no API token for c
 | **Burp / proxy** | `--proxy`, `--cookie`, repeatable `--header` |
 | **Caching** | SQLite cache at `~/.cache/wp-core-fingerprint/` |
 | **Docker** | Container with `wp-fingerprint` entrypoint |
-
----
-
-## Why this exists
-
-On a pentest or audit you often hit WordPress that has:
-
-- no `<meta name="generator">`
-- `readme.html` returning 404
-- `wp-includes/version.php` returning an empty body (PHP executes server-side)
-
-You still need the exact core version before CVE mapping means anything.
-
-This tool compares public core file hashes against every stable release on GitHub. When several assets match one tag and one file only matches that tag among the top candidates, you get patch-level confidence even on hardened installs.
-
-**WPScan** ([wpscanteam/wpscan](https://github.com/wpscanteam/wpscan)) is excellent for broad scanning but needs an API token and uses heuristics for core. Use both when you can: this tool for **exact core + evidence**, WPScan for **enumeration and CVE mapping**.
 
 ---
 
